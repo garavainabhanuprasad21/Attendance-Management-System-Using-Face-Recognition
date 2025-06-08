@@ -10,26 +10,43 @@ def train_model():
     face_samples = []
     ids = []
 
-    for root, dirs, files in os.walk(data_dir):
-        for file in files:
-            if file.endswith("jpg"):
-                path = os.path.join(root, file)
-                img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-                if img is None:
-                    print(f"Error: Unable to read image {path}")
+    if not os.path.exists(data_dir):
+        print(f"[ERROR] Dataset folder '{data_dir}' not found. Capture images first.")
+        return
+
+    for file in os.listdir(data_dir):
+        if file.endswith(".jpg"):
+            path = os.path.join(data_dir, file)
+            img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            if img is None:
+                print(f"[WARNING] Could not read image: {path}")
+                continue
+            try:
+                parts = file.split('_')
+                if len(parts) < 2:
+                    print(f"[WARNING] Unexpected filename format: {file}")
                     continue
-                student_id = int(file.split('.')[1])  # Extract ID from filename
-                faces = face_cascade.detectMultiScale(img)
+                student_id = int(parts[1].split('.')[0])  # handle e.g. "Alice_1.jpg"
+            except ValueError:
+                print(f"[WARNING] Invalid ID in filename: {file}")
+                continue
 
-                for (x, y, w, h) in faces:
-                    face_samples.append(img[y:y+h, x:x+w])
-                    ids.append(student_id)
+            # Since image is cropped face already, no need for detectMultiScale here
+            face_samples.append(img)
+            ids.append(student_id)
 
+    if len(face_samples) == 0:
+        print("[ERROR] No face samples found in dataset.")
+        return
+
+    print(f"[INFO] Training model with {len(face_samples)} samples.")
     recognizer.train(face_samples, np.array(ids))
+
     if not os.path.exists('trainer'):
         os.makedirs('trainer')
+
     recognizer.write('trainer/trainer.yml')
-    print(f"[INFO] {len(np.unique(ids))} faces trained.")
+    print(f"[INFO] Model training completed. Trainer saved to 'trainer/trainer.yml'.")
 
 if __name__ == "__main__":
     train_model()
